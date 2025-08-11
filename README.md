@@ -35,7 +35,6 @@ It allows you to **upload PDFs/TXT files**, store their embeddings locally, and 
 ### 1️⃣ Clone the repository
 ```bash
 git clone https://github.com/yourusername/docmind.git
-cd docmind
 ```
 
 ### 2️⃣ Install dependencies
