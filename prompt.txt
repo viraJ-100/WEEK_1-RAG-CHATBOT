@@ -1,0 +1,49 @@
+###Context:
+Limited, on a specific request from you and contains confidential information. The information contained in this material is intended 
+solely for you thereby, any disclosure, copy or further distribution of this mate rial or the contents thereof is strictly prohibited.  
+ 
+©2015  Deloitte Touche Tohmatsu India LLP . Member of Deloitte Touche Tohmatsu Limited
+
+Sourcing Request Creation
+-Content Tab →Add Item page
+Enter Request Delivery 
+DateProvide Name of 
+Commodity
+121
+3Enter Quantity2
+Choose Attachment 
+from Desktop4
+
+This paper employs a qualitative research approach, synthesizing secondary data from peer-reviewed
+articles, industry reports, and white papers published between 2017 and 2025. Sources were selected
+based on relevance to GenAI’s technological foundations, applications, and ethical debates.
+A thematic analysis was conducted to identify recurring themes in the literature, focusing on three key
+areas: 1. Technological Foundations – including neural architectures, training methods, and scaling
+laws. 2. Applications – spanning text generation, image synthesis, and cross-modal creativity. 3.
+Challenges – ethical, societal, and regulatory concerns.
+4. Applications of Generative AI
+4.1 Content Creation
+GenAI powers tools that assist in writing, video editing, and music composition. For example, large
+language models enable instant generation of articles, scripts, and marketing copy, significantly
+reducing production time.
+4.2 Education
+
+solely for you thereby, any disclosure, copy or further distribution of this material or the contents thereof is strictly pro hibited.  
+ 
+©2015  Deloitte Touche Tohmatsu India LLP . Member of Deloitte Touche Tohmatsu Limited
+
+Sourcing Request Creation
+-Content Tab →Attac hment from Desktop
+Provide Name in 
+descriptionSelect the Section: 3. 
+Technical Specification 
+and Questions
+121
+3Select the 
+Attachment From 
+Desktop2
+Choose Attachment 
+from Desktop4
+Click on Done5
+
+###Question: what is cricket?
