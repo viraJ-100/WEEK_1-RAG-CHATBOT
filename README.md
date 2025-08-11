@@ -78,11 +78,15 @@ Click **✏️ New Conversation** in the sidebar to:
 ---
 
 ## 🖼️ Screenshot
+**On StartUp**
 ![App Screenshot](./images/1.png)
+**File Uploaded**
 ![App Screenshot](./images/2.png)
+**Query Processing**
 ![App Screenshot](./images/3.png)
+**AI Response1**
 ![App Screenshot](./images/4.png)
 ![App Screenshot](./images/5.png)
+**AI Response2**
 ![App Screenshot](./images/6.png)
-![App Screenshot](./images/7.png)
 
