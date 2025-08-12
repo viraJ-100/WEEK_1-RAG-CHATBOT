@@ -78,18 +78,18 @@ Click **Clear DB** in the sidebar to:
 
 ## 🖼️ Screenshot
 **On StartUp**
-![App Screenshot](./images/1.png)
+![App Screenshot](./images/start.png)
 **File Uploaded**
-![App Screenshot](./images/2.png)
+![App Screenshot](./images/file.png)
 **Query Processing**
-![App Screenshot](./images/3.png)
+![App Screenshot](./images/q.png)
 **AI Response1**
-![App Screenshot](./images/4.png)
-![App Screenshot](./images/5.png)
+![App Screenshot](./images/r1.png)
 **AI Response2**
-![App Screenshot](./images/6.png)
+![App Screenshot](./images/r2.png)
 **Summarize**
-![App Screenshot](./images/sum.png)
+![App Screenshot](./images/s1.png)
+![App Screenshot](./images/s2.png)
 **Quiz**
 ![App Screenshot](./images/Qu1.png)
 ![App Screenshot](./images/Qu2.png)
