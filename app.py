@@ -7,7 +7,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from PyPDF2 import PdfReader
 import os
-import shutil
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -21,20 +20,40 @@ def clear_db():
         embedding_function=embedding_model
     ).delete_collection()
 
+
 # --- Page Config ---
 st.set_page_config(page_title="RAG STUDY BOT", page_icon="./images/icon.png", layout="wide")
+
+# Default page setting
+if "page" not in st.session_state:
+    st.session_state.page = "chat"
+
 
 # --- Sidebar ---
 # Button at the top
 with st.sidebar:
-    st.markdown('<div>', unsafe_allow_html=True)
+    
     if st.button("✏️ New Conversation"):
+        st.session_state.messages = []
+        st.session_state.page = "chat"
+
+    
+    if st.button("Quiz Time"):
+        st.session_state.page = "quiz"
+
+    
+    if st.button("Summarization"):
+        st.session_state.page = "summarization"
+
+    if st.button("Clear DB"):
         st.session_state.messages = []
         vectorstore = None
         retriever = None
         clear_db()
-    st.markdown('</div>', unsafe_allow_html=True)
-    
+        if retriever is None:
+            st.warning("⚠️ No files to clear.")
+        else:
+            st.success("✅ Database has been cleared!", icon="🗑️")
 
 
 # Upload section
@@ -104,18 +123,18 @@ def add_to_chroma(chunks):
     # Get existing IDs
     existing_items = db.get(include=[])
     existing_ids = set(existing_items["ids"])
-    print(f"Number of existing docs: {len(existing_ids)}")
+    # print(f"Number of existing docs: {len(existing_ids)}")
 
     # Filter only new chunks
     new_chunks = [chunk for chunk in chunks_with_ids if chunk.metadata["id"] not in existing_ids]
 
     if new_chunks:
-        print(f"Adding {len(new_chunks)} new documents...")
+        # print(f"Adding {len(new_chunks)} new documents...")
         new_ids = [chunk.metadata["id"] for chunk in new_chunks]
         db.add_documents(new_chunks, ids=new_ids)
         db.persist()
     else:
-        print("No new documents to add.")
+        print(".")
 
 
 # If new files uploaded, process them and add to DB
@@ -176,52 +195,53 @@ if vectorstore:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- Display Chat History ---
-for message in st.session_state.messages:
-    st.chat_message(message["role"]).markdown(message["content"])
+if st.session_state.page == "chat":
+    # --- Display Chat History ---
+    for message in st.session_state.messages:
+        st.chat_message(message["role"]).markdown(message["content"])
 
-# --- User Input ---
-user_query = st.chat_input("Your question about the PDFs...")
-    
-if user_query:
-    if retriever is None:
-        st.warning("⚠️ Please upload PDF files first before asking questions.")
-    else:
-        # Show user message
-        st.chat_message("user").markdown(user_query)
-        st.session_state.messages.append({"role": "user", "content": user_query})
+    # --- User Input ---
+    user_query = st.chat_input("Your question about the PDFs...")
+        
+    if user_query:
+        if retriever is None:
+            st.warning("⚠️ Please upload files first before asking questions.")
+        else:
+            # Show user message
+            st.chat_message("user").markdown(user_query)
+            st.session_state.messages.append({"role": "user", "content": user_query})
 
-        with st.spinner("Thinking..."):
-            docs = retriever.get_relevant_documents(user_query)
-            context = "\n\n".join([doc.page_content for doc in docs])
+            with st.spinner("Thinking..."):
+                docs = retriever.get_relevant_documents(user_query)
+                context = "\n\n".join([doc.page_content for doc in docs])
 
-            llm = Groq(api_key=groq_api_key)
-            #-----------------------------------------------------------------AUGMENTED-------------------------------------------------------
-            system_message = """
-            You are an assistant who answers user queries based on business process manuals, training guides, and procedural documentation.
-            The user input will include the context you need to answer the question.
+                llm = Groq(api_key=groq_api_key)
+                #-----------------------------------------------------------------AUGMENTED-------------------------------------------------------
+                system_message = """
+                You are an assistant who answers user queries based on business process manuals, training guides, and procedural documentation.
+                The user input will include the context you need to answer the question.
 
-            The context will begin with the token: ###Context.
-            This context contains references to specific sections of one or more documents relevant to the query.
+                The context will begin with the token: ###Context.
+                This context contains references to specific sections of one or more documents relevant to the query.
 
-            The user question will begin with the token: ###Question.
+                The user question will begin with the token: ###Question.
 
-            Instructions:
-            1. Answer only using the information provided in the context.
-            2. Do not mention or refer to the context in your answer.
-            3. If the answer cannot be found in the context, respond exactly with: "I don't know".
-            4. Keep answers clear, concise, and aligned with the terminology and process descriptions typically found in business manuals and procedural guides.
-            """
+                Instructions:
+                1. Answer only using the information provided in the context.
+                2. Do not mention or refer to the context in your answer.
+                3. If the answer cannot be found in the context, respond exactly with: "I don't know".
+                4. Keep answers clear, concise, and aligned with the terminology and process descriptions typically found in business manuals and procedural guides.
+                """
 
-            prompt = f"###Context:\n{context}\n\n###Question: {user_query}"
+                prompt = f"###Context:\n{context}\n\n###Question: {user_query}"
 
-            # Clear existing content and write the new prompt
-            with open("prompt.txt", "w", encoding="utf-8") as f:
-                f.write(prompt)
+                # Clear existing content and write the new prompt
+                with open("prompt.txt", "w", encoding="utf-8") as f:
+                    f.write(prompt)
 
-            model_name = os.getenv("model_name")
+                model_name = os.getenv("model_name")
 
-            response = llm.chat.completions.create(
+                response = llm.chat.completions.create(
                     model=model_name,
                     messages=[
                         {"role": "system", "content": system_message},
@@ -229,15 +249,146 @@ if user_query:
                     ],
                     temperature=0
                 )
-            #-----------------------------------------------------------------GENERATION-------------------------------------------------------
-            ai_reply = response.choices[0].message.content
+                #-----------------------------------------------------------------GENERATION-------------------------------------------------------
+                ai_reply = response.choices[0].message.content
 
-        # Show assistant message
-        st.chat_message("assistant").markdown(ai_reply)
-        st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+                # --- 📌 ADD COMPACT CITATIONS ---
+                citations_dict = {}
+                for doc in docs:
+                    src = doc.metadata.get("source", "Unknown Source")
+                    page = doc.metadata.get("page", "N/A")
+                    if src not in citations_dict:
+                        citations_dict[src] = set()
+                    citations_dict[src].add(str(page))
 
-if not st.session_state.messages:
+                citations_str = " | ".join([
+                    f"{src} : {','.join(sorted(pages, key=lambda x: int(x) if x.isdigit() else 999))}"
+                    for src, pages in citations_dict.items()
+                ])
+
+                if citations_str:
+                    ai_reply += f"\n\n[Sources: {citations_str}]"
+
+            # Show assistant message
+            st.chat_message("assistant").markdown(ai_reply)
+            st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+
+    if not st.session_state.messages:
         st.markdown(
             "<h1 style='font-size: 20px;'>Ask. Explore. Understand your documents!!!</h1>",
             unsafe_allow_html=True
         )
+
+
+elif st.session_state.page == "quiz":
+    st.title("📝 Quiz Time")
+
+    topic = st.text_input("Enter a topic")
+
+    if st.button("Generate Quiz"):
+        if not topic.strip():
+            st.error("⚠️ Please enter a topic before generating the quiz.")
+            st.stop()
+
+        with st.spinner("Generating quiz..."):
+            llm = Groq(api_key=groq_api_key)
+
+            # Retrieve relevant chunks using semantic search
+            relevant_docs = vectorstore.similarity_search(topic, k=5)  # Adjust k as needed
+            if not relevant_docs:
+                st.error(f"❌ No relevant content found for '{topic}'.")
+                st.stop()
+            db_content = " ".join([doc.page_content for doc in relevant_docs])
+
+            # Build quiz prompt
+            quiz_prompt = f"""
+            Create a multiple-choice quiz based strictly on the following document content:
+            {db_content}
+
+            Do NOT use any outside knowledge.
+
+            Output format:
+            Q: <question>
+            A) <option1>
+            B) <option2>
+            C) <option3>
+            D) <option4>
+            Correct Answer: <letter>
+            Generate 10 questions.
+            """
+
+            # Call LLM
+            response = llm.chat.completions.create(
+                model=os.getenv("model_name"),
+                messages=[{"role": "user", "content": quiz_prompt}],
+                temperature=0.7
+            )
+
+            quiz_text = response.choices[0].message.content
+
+        st.markdown("### Your Quiz")
+        st.text_area("Generated Quiz", quiz_text, height=400)
+
+
+elif st.session_state.page == "summarization":
+    st.title("📄 Summarization")
+
+    if st.button("Generate Summary"):
+        if vectorstore:
+            with st.spinner("Summarizing the document database..."):
+                # Pull all documents from the DB
+                docs_data = vectorstore.get(include=["documents"])
+                db_content_list = docs_data["documents"] if docs_data and docs_data["documents"] else None
+
+                if db_content_list:
+                    llm = Groq(api_key=groq_api_key)
+
+                    # --- Token-based chunking ---
+                    text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+                        chunk_size=2000,  # tokens
+                        chunk_overlap=200
+                    )
+                    chunks = text_splitter.split_text(" ".join(db_content_list))
+
+                    summaries = []
+                    for idx, chunk in enumerate(chunks, 1):
+                        summarize_prompt = f"""
+                        You are a summarization assistant. Summarize ONLY the provided chunk of text.
+                        Do NOT use outside information.
+
+                        Formatting guidelines:
+                        - Organize by **topic** where possible.
+                        - Include short paragraphs and bullet points.
+                        - Keep key facts, numbers, and terminology intact.
+
+                        Text chunk ({idx}/{len(chunks)}):
+                        {chunk}
+                        """
+                        response = llm.chat.completions.create(
+                            model=os.getenv("model_name"),
+                            messages=[{"role": "user", "content": summarize_prompt}],
+                            temperature=0.2
+                        )
+                        summaries.append(response.choices[0].message.content)
+
+                    # --- Combine chunk summaries ---
+                    final_prompt = f"""
+                    Combine the following chunk summaries into a single cohesive, topic-wise summary.
+                    Keep it concise but detailed. Preserve important facts and structure.
+
+                    Chunk summaries:
+                    {" ".join(summaries)}
+                    """
+                    final_response = llm.chat.completions.create(
+                        model=os.getenv("model_name"),
+                        messages=[{"role": "user", "content": final_prompt}],
+                        temperature=0.2
+                    )
+                    final_summary = final_response.choices[0].message.content
+
+                    st.subheader("📌 Topic-wise Summary")
+                    st.write(final_summary)
+                else:
+                    st.warning("No documents found in the database.")
+        else:
+            st.warning("Vectorstore is not initialized. Please upload and process documents first.")
