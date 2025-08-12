@@ -269,22 +269,29 @@ if st.session_state.page == "chat":
                 #-----------------------------------------------------------------GENERATION-------------------------------------------------------
                 ai_reply = response.choices[0].message.content
 
-                # --- 📌 ADD COMPACT CITATIONS ---
-                citations_dict = {}
-                for doc in docs:
-                    src = doc.metadata.get("source", "Unknown Source")
-                    page = doc.metadata.get("page", "N/A")
-                    if src not in citations_dict:
-                        citations_dict[src] = set()
-                    citations_dict[src].add(str(page))
+                # Skip citations when the model indicates it doesn't know
+                reply_clean = ai_reply.strip().strip('"').strip("'")
+                reply_clean_lower = reply_clean.rstrip('.').lower()
+                is_unknown = reply_clean_lower in ["i don't know", "i dont know"]
 
-                citations_str = " | ".join([
-                    f"{src} : {','.join(sorted(pages, key=lambda x: int(x) if x.isdigit() else 999))}"
-                    for src, pages in citations_dict.items()
-                ])
+                if not is_unknown:
+                    # --- 📌 ADD COMPACT CITATIONS ---
+                    citations_dict = {}
+                    for doc in docs:
+                        src = doc.metadata.get("source", "Unknown Source")
+                        page = doc.metadata.get("page", "N/A")
+                        if src not in citations_dict:
+                            citations_dict[src] = set()
+                        citations_dict[src].add(str(page))
 
-                if citations_str:
-                    ai_reply += f"\n\n[Sources: {citations_str}]"
+                    citations_str = " | ".join([
+                        f"{src} : {','.join(sorted(pages, key=lambda x: int(x) if x.isdigit() else 999))}"
+                        for src, pages in citations_dict.items()
+                    ])
+
+                    if citations_str:
+                        ai_reply += f"\n\n[Sources: {citations_str}]"
+                
 
             # Show assistant message
             st.chat_message("assistant").markdown(ai_reply)
