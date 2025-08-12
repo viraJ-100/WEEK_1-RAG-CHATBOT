@@ -91,7 +91,7 @@ Click **Clear DB** in the sidebar to:
 ![App Screenshot](./images/s1.png)
 ![App Screenshot](./images/s2.png)
 **Quiz**
-![App Screenshot](./images/Qu1.png)
-![App Screenshot](./images/Qu2.png)
+![App Screenshot](./images/qu1.png)
+![App Screenshot](./images/qu2.png)
 
 
