@@ -69,7 +69,7 @@ streamlit run app.py
 ---
 
 ## 🔄 Resetting the Database
-Click **✏️ New Conversation** in the sidebar to:
+Click **Clear DB** in the sidebar to:
 - Clear chat history
 - Reset the retriever
 - (Optional) Delete all stored embeddings
@@ -88,4 +88,9 @@ Click **✏️ New Conversation** in the sidebar to:
 ![App Screenshot](./images/5.png)
 **AI Response2**
 ![App Screenshot](./images/6.png)
+**Quiz**
+![App Screenshot](./images/7.png)
+**Summarize**
+![App Screenshot](./images/8.png)
+![App Screenshot](./images/9.png)
 
