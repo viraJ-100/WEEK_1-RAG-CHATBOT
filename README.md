@@ -88,10 +88,10 @@ Click **Clear DB** in the sidebar to:
 ![App Screenshot](./images/5.png)
 **AI Response2**
 ![App Screenshot](./images/6.png)
-**Quiz**
-![App Screenshot](./images/7.png)
 **Summarize**
-![App Screenshot](./images/8.png)
-![App Screenshot](./images/9.png)
+![App Screenshot](./images/Sum.png)
+**Quiz**
+![App Screenshot](./images/Qu1.png)
+![App Screenshot](./images/Qu2.png)
 
 
