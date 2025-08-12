@@ -8,6 +8,7 @@ from langchain.schema import Document
 from PyPDF2 import PdfReader
 import os
 from dotenv import load_dotenv
+import json
 load_dotenv()
 
 embedding_model = OllamaEmbeddings(model="nomic-embed-text") 
@@ -28,24 +29,40 @@ st.set_page_config(page_title="RAG STUDY BOT", page_icon="./images/icon.png", la
 if "page" not in st.session_state:
     st.session_state.page = "chat"
 
+# --- Global Styles (make sidebar buttons same size) ---
+st.markdown(
+    """
+    <style>
+    /* Make all sidebar buttons equal width and height */
+    [data-testid="stSidebar"] .stButton { width: 100% !important; }
+    [data-testid="stSidebar"] .stButton button {
+        width: 100% !important;
+        height: 48px !important;
+        display: block !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 # --- Sidebar ---
 # Button at the top
 with st.sidebar:
     
-    if st.button("✏️ New Conversation"):
+    if st.button("✏️ New Conversation", use_container_width=True):
         st.session_state.messages = []
         st.session_state.page = "chat"
 
     
-    if st.button("Quiz Time"):
+    if st.button("Quiz Time", use_container_width=True):
         st.session_state.page = "quiz"
 
     
-    if st.button("Summarization"):
+    if st.button("Summarization", use_container_width=True):
         st.session_state.page = "summarization"
 
-    if st.button("Clear DB"):
+    if st.button("Clear DB", use_container_width=True):
         st.session_state.messages = []
         vectorstore = None
         retriever = None
@@ -284,37 +301,56 @@ elif st.session_state.page == "quiz":
     st.title("📝 Quiz Time")
 
     topic = st.text_input("Enter a topic")
+    num_questions = st.number_input(
+        "Number of questions",
+        min_value=1,
+        max_value=50,
+        value=10,
+        step=1,
+    )
 
     if st.button("Generate Quiz"):
         if not topic.strip():
             st.error("⚠️ Please enter a topic before generating the quiz.")
+            st.stop()
+        if vectorstore is None:
+            st.warning("Vectorstore is not initialized. Please upload and process documents first.")
             st.stop()
 
         with st.spinner("Generating quiz..."):
             llm = Groq(api_key=groq_api_key)
 
             # Retrieve relevant chunks using semantic search
-            relevant_docs = vectorstore.similarity_search(topic, k=5)  # Adjust k as needed
+            retrieval_k = min(50, max(5, int(num_questions) * 2))
+            relevant_docs = vectorstore.similarity_search(topic, k=retrieval_k)
             if not relevant_docs:
                 st.error(f"❌ No relevant content found for '{topic}'.")
                 st.stop()
             db_content = " ".join([doc.page_content for doc in relevant_docs])
 
-            # Build quiz prompt
+            # Build quiz prompt (request strict JSON)
             quiz_prompt = f"""
-            Create a multiple-choice quiz based strictly on the following document content:
+            You are to create a multiple-choice quiz strictly from the provided content. Do NOT use any outside knowledge.
+
+            Content:
             {db_content}
 
-            Do NOT use any outside knowledge.
+            Requirements:
+            - Generate exactly {int(num_questions)} questions.
+            - Each question must have exactly 4 options.
+            - Provide the correct option letter (A, B, C, or D).
+            - Provide a brief explanation of why the correct answer is correct based only on the content.
 
-            Output format:
-            Q: <question>
-            A) <option1>
-            B) <option2>
-            C) <option3>
-            D) <option4>
-            Correct Answer: <letter>
-            Generate 10 questions.
+            Output:
+            - Return ONLY a strict JSON array (no backticks, no markdown) of objects with this schema:
+              [
+                {{
+                  "question": string,
+                  "options": [string, string, string, string],
+                  "correct": "A" | "B" | "C" | "D",
+                  "explanation": string
+                }}
+              ]
             """
 
             # Call LLM
@@ -324,71 +360,121 @@ elif st.session_state.page == "quiz":
                 temperature=0.7
             )
 
-            quiz_text = response.choices[0].message.content
+            raw_output = response.choices[0].message.content.strip()
 
-        st.markdown("### Your Quiz")
-        st.text_area("Generated Quiz", quiz_text, height=400)
+            # Try parse JSON directly; fallback to extracting JSON array
+            quiz_items = None
+            try:
+                quiz_items = json.loads(raw_output)
+            except Exception:
+                try:
+                    start = raw_output.find("[")
+                    end = raw_output.rfind("]")
+                    if start != -1 and end != -1 and end > start:
+                        quiz_items = json.loads(raw_output[start:end+1])
+                except Exception:
+                    quiz_items = None
+
+        if not isinstance(quiz_items, list):
+            st.error("Failed to parse quiz. Please try again.")
+        else:
+            st.markdown("### Your Quiz")
+            option_labels = ["A", "B", "C", "D"]
+            for idx, item in enumerate(quiz_items, start=1):
+                question = item.get("question", "").strip()
+                options = item.get("options", [])
+                correct = item.get("correct", "").strip()
+                explanation = item.get("explanation", "").strip()
+
+                st.markdown(f"**Q{idx}. {question}**")
+                # Ensure exactly 4 options
+                if not isinstance(options, list) or len(options) != 4:
+                    st.warning("This question did not return 4 options.")
+                for i, opt in enumerate(options[:4]):
+                    label = option_labels[i] if i < 4 else ""
+                    st.markdown(f"{label}) {opt}")
+
+                with st.expander("Show answer and explanation"):
+                    st.markdown(f"**Correct:** {correct}")
+                    if explanation:
+                        st.write(explanation)
 
 
 elif st.session_state.page == "summarization":
     st.title("📄 Summarization")
 
-    if st.button("Generate Summary"):
-        if vectorstore:
-            with st.spinner("Summarizing the document database..."):
-                # Pull all documents from the DB
-                docs_data = vectorstore.get(include=["documents"])
-                db_content_list = docs_data["documents"] if docs_data and docs_data["documents"] else None
+    if vectorstore is None:
+        st.warning("Vectorstore is not initialized. Please upload and process documents first.")
+    else:
+        # Build list of available PDF sources from the DB
+        data_for_sources = vectorstore.get(include=["metadatas"]) or {}
+        metadatas = data_for_sources.get("metadatas", []) or []
+        all_sources = [m.get("source") for m in metadatas if isinstance(m, dict) and m.get("source")]
+        pdf_sources = sorted({s for s in all_sources if str(s).lower().endswith(".pdf")})
 
-                if db_content_list:
-                    llm = Groq(api_key=groq_api_key)
-
-                    # --- Token-based chunking ---
-                    text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-                        chunk_size=2000,  # tokens
-                        chunk_overlap=200
-                    )
-                    chunks = text_splitter.split_text(" ".join(db_content_list))
-
-                    summaries = []
-                    for idx, chunk in enumerate(chunks, 1):
-                        summarize_prompt = f"""
-                        You are a summarization assistant. Summarize ONLY the provided chunk of text.
-                        Do NOT use outside information.
-
-                        Formatting guidelines:
-                        - Organize by **topic** where possible.
-                        - Include short paragraphs and bullet points.
-                        - Keep key facts, numbers, and terminology intact.
-
-                        Text chunk ({idx}/{len(chunks)}):
-                        {chunk}
-                        """
-                        response = llm.chat.completions.create(
-                            model=os.getenv("model_name"),
-                            messages=[{"role": "user", "content": summarize_prompt}],
-                            temperature=0.2
-                        )
-                        summaries.append(response.choices[0].message.content)
-
-                    # --- Combine chunk summaries ---
-                    final_prompt = f"""
-                    Combine the following chunk summaries into a single cohesive, topic-wise summary.
-                    Keep it concise but detailed. Preserve important facts and structure.
-
-                    Chunk summaries:
-                    {" ".join(summaries)}
-                    """
-                    final_response = llm.chat.completions.create(
-                        model=os.getenv("model_name"),
-                        messages=[{"role": "user", "content": final_prompt}],
-                        temperature=0.2
-                    )
-                    final_summary = final_response.choices[0].message.content
-
-                    st.subheader("📌 Topic-wise Summary")
-                    st.write(final_summary)
-                else:
-                    st.warning("No documents found in the database.")
+        if not pdf_sources:
+            st.warning("No PDFs found in the database. Please upload PDF files first.")
         else:
-            st.warning("Vectorstore is not initialized. Please upload and process documents first.")
+            col1, col2 = st.columns([2, 1])
+            selected_pdf = col1.selectbox("Choose a PDF", options=pdf_sources, index=0)
+            target_words = col2.number_input(
+                "Number of words",
+                min_value=50,
+                max_value=2000,
+                value=200,
+                step=50,
+            )
+
+            if st.button("Generate Summary"):
+                with st.spinner(f"Summarizing '{selected_pdf}'..."):
+                    # Pull only the selected PDF's documents from the DB
+                    docs_data = vectorstore.get(where={"source": selected_pdf}, include=["documents"]) or {}
+                    db_content_list = docs_data.get("documents") if docs_data else None
+
+                    if db_content_list:
+                        llm = Groq(api_key=groq_api_key)
+
+                        # --- Token-based chunking ---
+                        text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+                            chunk_size=2000,  # tokens
+                            chunk_overlap=200,
+                        )
+                        chunks = text_splitter.split_text(" ".join(db_content_list))
+
+                        summaries = []
+                        for idx, chunk in enumerate(chunks, 1):
+                            summarize_prompt = f"""
+                            You are a summarization assistant. Summarize ONLY the provided chunk of text from the document '{selected_pdf}'.
+                            Do NOT use outside information.
+
+                            Keep key facts, numbers, and terminology intact.
+
+                            Text chunk ({idx}/{len(chunks)}):
+                            {chunk}
+                            """
+                            response = llm.chat.completions.create(
+                                model=os.getenv("model_name"),
+                                messages=[{"role": "user", "content": summarize_prompt}],
+                                temperature=0.2,
+                            )
+                            summaries.append(response.choices[0].message.content)
+
+                        # --- Combine chunk summaries with word target ---
+                        final_prompt = f"""
+                        Combine the following chunk summaries into a single cohesive summary for the document '{selected_pdf}'.
+                        Write approximately {int(target_words)} words. Be concise but preserve important facts and structure.
+
+                        Chunk summaries:
+                        {" ".join(summaries)}
+                        """
+                        final_response = llm.chat.completions.create(
+                            model=os.getenv("model_name"),
+                            messages=[{"role": "user", "content": final_prompt}],
+                            temperature=0.2,
+                        )
+                        final_summary = final_response.choices[0].message.content
+
+                        st.subheader("📌 Summary")
+                        st.write(final_summary)
+                    else:
+                        st.warning("No content found in the database for the selected PDF.")
