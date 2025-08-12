@@ -89,7 +89,7 @@ Click **Clear DB** in the sidebar to:
 **AI Response2**
 ![App Screenshot](./images/6.png)
 **Summarize**
-![App Screenshot](./images/Sum.png)
+![App Screenshot](./images/sum.png)
 **Quiz**
 ![App Screenshot](./images/Qu1.png)
 ![App Screenshot](./images/Qu2.png)
